@@ -1,6 +1,5 @@
 <?php
 
-namespace Drupal\icontact_integration\Plugin;
 /**
  * @name iContactApi
  * @package iContact
