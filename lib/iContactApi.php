@@ -1,19 +1,21 @@
 <?php
+
+namespace Drupal\icontact_integration\Plugin;
 /**
  * @name iContactApi
  * @package iContact
  * @author iContact <www.icontact.com>
- * @description This class is a wrapper for the iContact API.  
- * It makes integrating iContact into your app as simple as 
+ * @description This class is a wrapper for the iContact API.
+ * It makes integrating iContact into your app as simple as
  * calling a method.
  * @version 2.0
 **/
 class iContactApi {
-	
+
 	//////////////////////////////////////////////////////////////////////////////
 	/// Properties //////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////
-	
+
 	protected static $oInstance  = null;    // This holds the instance of this class
 	protected $iAccountId        = null;    // This holds the account ID
 	protected $iClientFolderId   = null;    // This holds the client folder ID
@@ -26,7 +28,7 @@ class iContactApi {
 	protected $aSearchParameters = array(); // This is our container for search params
 	protected $iTotal            = 0;       // If the results return a total, it will be stored here
 	protected $aWarnings         = array(); // This holds the warnings encountered with the iContact API
-	
+
 	//////////////////////////////////////////////////////////////////////////////
 	/// Singleton ///////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////
@@ -39,12 +41,12 @@ class iContactApi {
 	 * @return iContactApi $this
 	**/
 	public static function setInstance($oInstance) {
-	
+
 		self::$oInstance = $oInstance;
 		// Return instance of class
 		return self::$oInstance;
 	}
-	
+
 	/**
 	 * This gets the singleton instance
 	 * @static
@@ -64,7 +66,7 @@ class iContactApi {
 			return self::$oInstance;
 		}
 	}
-	
+
 	/**
 	 * This resets the singleton instance to null
 	 * @static
@@ -82,7 +84,7 @@ class iContactApi {
 
 	/**
 	 * This is our constuctor and simply checks for
-	 * defined constants and configuration values and 
+	 * defined constants and configuration values and
 	 * then builds the configuration from that
 	 * @access protected
 	 * @return iContactApi $this
@@ -90,11 +92,11 @@ class iContactApi {
 	protected function __construct() {
 		// Check for constants
 		$aConstantMap = array(
-			// 'ICONTACT_APIVERSION', 
-			// 'ICONTACT_APISANDBOXURL', 
-			'ICONTACT_APPID'       => 'appId', 
-			// 'ICONTACT_APIURL', 
-			'ICONTACT_APIUSERNAME' => 'apiUsername',  
+			// 'ICONTACT_APIVERSION',
+			// 'ICONTACT_APISANDBOXURL',
+			'ICONTACT_APPID'       => 'appId',
+			// 'ICONTACT_APIURL',
+			'ICONTACT_APIUSERNAME' => 'apiUsername',
 			'ICONTACT_APIPASSWORD' => 'apiPassword'
 		);
 		// Loop through the map
@@ -207,11 +209,70 @@ class iContactApi {
 		} else {
 			$aContact['status'] = 'normal';
 		}
-		
+
+		try {
 		// Make the call
-		$aContacts = $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/contacts", 'POST', array($aContact), 'contacts');
+			$aContacts = $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/contacts", 'POST', array($aContact), 'contacts');
+		} catch (\Exception $e) {
+			// log the error message
+			log_icontact_messages('alert', $e->getMessage());
+		}
+
 		// Return the contact
 		return $aContacts[0];
+	}
+
+	/**
+	 * This method adds a contact to your iContact account
+	 * @access public
+	 * @param string $sEmail
+	 * @param string [$sStatus]
+	 * @param string [$sPrefix]
+	 * @param string [$sFirstName]
+	 * @param string [$sLastName]
+	 * @param string [$sSuffix]
+	 * @param string [$sStreet]
+	 * @param string [$sStreet2]
+	 * @param string [$sCity]
+	 * @param string [$sState]
+	 * @param string [$sPostalCode]
+	 * @param string [$sPhone]
+	 * @param string [$sFax]
+	 * @param string [$sBusiness]
+	 *
+	 * @return object
+	**/
+	public function addContactArrayValues($field_data) {
+		$resultData = array();
+		// Valid statuses
+		$aValidStatuses = array('normal', 'bounced', 'donotcontact', 'pending', 'invitable', 'deleted');
+		// Contact placeholder
+
+		$aContact = array();
+		if(!empty($field_data)) {
+			foreach ($field_data as $field_name => $field_value) {
+				$aContact[$field_name] = (string) $field_value;
+			}
+		// Check for a valid status
+			if (isset($field_data['sStatus']) && in_array($field_data['sStatus'], $aValidStatuses)) {
+			// Add the new status
+				$aContact['status'] = $field_data['sStatus'];
+			} else {
+				$aContact['status'] = 'normal';
+			}
+
+			try {
+		// Make the call
+				$aContacts = $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/contacts", 'POST', array($aContact), 'contacts');
+		// Return the contact
+				$resultData =  $aContacts[0]??[];
+			} catch (\Exception $e) {
+			   // log the error message
+				log_icontact_messages('alert', $e->getMessage());
+			}
+		}
+
+		return $resultData;
 	}
 
 	/**
@@ -244,12 +305,12 @@ class iContactApi {
 	public function addList($sName, $iWelcomeMessageId, $bEmailOwnerOnChange = true, $bWelcomeOnManualAdd = false, $bWelcomeOnSignupAdd = false, $sDescription = null, $sPublicName = null) {
 		// Setup the list
 		$aList = array(
-			'name'               => $sName, 
-			'welcomeMessageId'   => $iWelcomeMessageId, 
-			'emailOwnerOnChange' => intval($bEmailOwnerOnChange), 
-			'welcomeOnManualAdd' => intval($bWelcomeOnManualAdd), 
-			'welcomeOnSignupAdd' => intval($bWelcomeOnSignupAdd), 
-			'description'        => $sDescription, 
+			'name'               => $sName,
+			'welcomeMessageId'   => $iWelcomeMessageId,
+			'emailOwnerOnChange' => intval($bEmailOwnerOnChange),
+			'welcomeOnManualAdd' => intval($bWelcomeOnManualAdd),
+			'welcomeOnSignupAdd' => intval($bWelcomeOnSignupAdd),
+			'description'        => $sDescription,
 			'publicname'         => $sPublicName
 		);
 		// Make the call
@@ -259,7 +320,7 @@ class iContactApi {
 	}
 
 	/**
-	 * This method adds a message to 
+	 * This method adds a message to
 	 * your iContact API account
 	 * @access public
 	 * @param string $sSubject
@@ -276,11 +337,11 @@ class iContactApi {
 		$aValidMessageTypes = array('normal', 'autoresponder', 'welcome', 'confirmation');
 		// Setup the message data
 		$aMessage           = array(
-			'campaignId'  => $iCampaignId, 
-			'htmlBody'    => $sHtmlBody, 
-			'messageName' => $sMessageName, 
-			'messageType' => (in_array($sMessageType, $aValidMessageTypes) ? $sMessageType : 'normal'), 
-			'subject'     => $sSubject, 
+			'campaignId'  => $iCampaignId,
+			'htmlBody'    => $sHtmlBody,
+			'messageName' => $sMessageName,
+			'messageType' => (in_array($sMessageType, $aValidMessageTypes) ? $sMessageType : 'normal'),
+			'subject'     => $sSubject,
 			'textBody'    => $sTextBody
 		);
 		// Add the message
@@ -301,7 +362,7 @@ class iContactApi {
 		// Check for existing order by parameters
 		if (empty($this->aSearchParameters['orderby'])) {
 			// Check for a direction
-			if (empty($sDirection)) { 
+			if (empty($sDirection)) {
 				// Add just the field
 				$this->aSearchParameters['orderby'] = (string) $sField;
 			} else {
@@ -359,7 +420,7 @@ class iContactApi {
 		$rHandle     = curl_init();
 		// Give our handle headers
 		curl_setopt($rHandle, CURLOPT_HTTPHEADER, $this->getHeaders());
-		// Tell our handle that we 
+		// Tell our handle that we
 		// want the data returned
 		curl_setopt($rHandle, CURLOPT_RETURNTRANSFER, true);
 		// Turn SSL verifcation off, so scripts do not get broken
@@ -368,51 +429,51 @@ class iContactApi {
 		// method we are using
 		switch (strtoupper($sMethod)) {
 			// Deleting data
-			case 'DELETE' : 
+			case 'DELETE' :
 				// Set the cURL custom header
-				curl_setopt($rHandle, CURLOPT_CUSTOMREQUEST, 'DELETE');
+			curl_setopt($rHandle, CURLOPT_CUSTOMREQUEST, 'DELETE');
 			break;
 			// Recieving data
 			case 'GET'    :
 				// Check for a query string
-				if (!empty($this->aSearchParameters)) {
+			if (!empty($this->aSearchParameters)) {
 					// Add the query string
-					$sApiUrl .= (string) '?'.http_build_query($this->aSearchParameters);
-				}
+				$sApiUrl .= (string) '?'.http_build_query($this->aSearchParameters);
+			}
 			break;
 			// Sending data
 			case 'POST'   :
 				// Check for POST data
-				if (empty($mPostData)) {
+			if (empty($mPostData)) {
 					// Add an error, for there is no
 					// POST data to send to the API
-					$this->addError('No POST data was provided.');
-				} else {
-					$this->sLastRequest = (string) json_encode($mPostData);
-					curl_setopt($rHandle, CURLOPT_POST, true);
-					curl_setopt($rHandle, CURLOPT_POSTFIELDS, $this->sLastRequest);
-				}
+				$this->addError('No POST data was provided.');
+			} else {
+				$this->sLastRequest = (string) json_encode($mPostData);
+				curl_setopt($rHandle, CURLOPT_POST, true);
+				curl_setopt($rHandle, CURLOPT_POSTFIELDS, $this->sLastRequest);
+			}
 			break;
 			// Uploading data
 			case 'PUT'    :
-				if (empty($mPostData)) {
+			if (empty($mPostData)) {
 					// Is there data?
-					$this->addError('No file or data specified for PUT request');
-				} elseif (!is_string($mPostData) || !file_exists($mPostData)) {
+				$this->addError('No file or data specified for PUT request');
+			} elseif (!is_string($mPostData) || !file_exists($mPostData)) {
 					// Not a file, so we assume this is just data
-					$this->sLastRequest = (string) json_encode($mPostData);
-					curl_setopt($rHandle, CURLOPT_CUSTOMREQUEST, "PUT");
-					curl_setopt($rHandle, CURLOPT_POSTFIELDS, $this->sLastRequest);
+				$this->sLastRequest = (string) json_encode($mPostData);
+				curl_setopt($rHandle, CURLOPT_CUSTOMREQUEST, "PUT");
+				curl_setopt($rHandle, CURLOPT_POSTFIELDS, $this->sLastRequest);
+			} else {
+				$rFileContentHandle = fopen($mPostData, 'r');
+				if ($rFileContentHandle === false) {
+					$this->addError('A non-existant file was specified for POST data, or the file could not be opened.');
 				} else {
-					$rFileContentHandle = fopen($mPostData, 'r');
-					if ($rFileContentHandle === false) {
-						$this->addError('A non-existant file was specified for POST data, or the file could not be opened.');
-					} else {
 						// Found a file, so upload its contents
-						curl_setopt($rHandle, CURLOPT_PUT, true);
-						curl_setopt($rHandle, CURLOPT_INFILE, $rFileContentHandle);
-					}
+					curl_setopt($rHandle, CURLOPT_PUT, true);
+					curl_setopt($rHandle, CURLOPT_INFILE, $rFileContentHandle);
 				}
+			}
 			break;
 		}
 		// Store the URL into the instance
@@ -453,8 +514,9 @@ class iContactApi {
 		}
 		// Check for set errors
 		if (!empty($this->aErrors)) {
+			$errors = $this->aErrors;
 			// Throw a new exception
-			throw new Exception('Errors have occurred and the system cannot continue.  Use getErrors() for details.');
+			// throw new \Exception($error_message);
 		}
 		// Check for a total
 		if (!empty($aResponse->total)) {
@@ -467,12 +529,12 @@ class iContactApi {
 			// Return success
 			return true;
 		} elseif (empty($sReturnKey)) {
-			// Return the entire 
+			// Return the entire
 			// base response
 			return $aResponse;
 		} else {
 			// Return the narrowed resposne
-			return $aResponse->$sReturnKey;
+			return $aResponse->$sReturnKey??[];
 		}
 	}
 
@@ -491,10 +553,10 @@ class iContactApi {
 		// Send the message
 		$aSends = $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/sends", 'POST', array(
 			array(
-				'excludeListIds'    => $sExcludeListIds, 
-				'excludeSegmentIds' => $sExcludeSegmentIds, 
-				'includeListIds'    => $sIncludeListIds, 
-				'includeSegmentIds' => $sIncludeSegmentIds, 
+				'excludeListIds'    => $sExcludeListIds,
+				'excludeSegmentIds' => $sExcludeSegmentIds,
+				'includeListIds'    => $sIncludeListIds,
+				'includeSegmentIds' => $sIncludeSegmentIds,
 				'scheduledTime'     => (empty($sScheduledTime) ? null : date('c', strtotime($sScheduledTime)))
 			)
 		), 'sends');
@@ -516,8 +578,8 @@ class iContactApi {
 		// Setup the subscription and make the call
 		$aSubscriptions = $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/subscriptions", 'POST', array(
 			array(
-				'contactId' => $iContactId, 
-				'listId'    => $iListId, 
+				'contactId' => $iContactId,
+				'listId'    => $iListId,
 				'status'    => $sStatus
 			)
 		), 'subscriptions');
@@ -623,7 +685,10 @@ class iContactApi {
 		// Make sure the contact isn't empty
 		if (!empty($aContact)) {
 			// Make the call
-			$oContact = $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/contacts/{$iContactId}", 'POST', array($aContact), 'contact');
+			// $oContact = $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/contacts/{$iContactId}", 'POST', array($aContact), 'contact');
+
+			$oContact = $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/contacts/{$iContactId}", 'POST', $aContact, 'contact');
+
 			// Return the contact
 			return $oContact;
 		}
@@ -645,7 +710,7 @@ class iContactApi {
 			// Make the call
 			$aUploads = $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/uploads", 'POST', array(
 				array(
-					'action' => 'add', 
+					'action' => 'add',
 					'listIds' => $iListId
 				)
 			), 'uploads');
@@ -687,12 +752,12 @@ class iContactApi {
 	public function updateList($iListId, $sName, $iWelcomeMessageId, $bEmailOwnerOnChange = true, $bWelcomeOnManualAdd = false, $bWelcomeOnSignupAdd = false, $sDescription = null, $sPublicName = null) {
 		// Setup the list
 		$aList = array(
-			'name'               => $sName, 
-			'welcomeMessageId'   => $iWelcomeMessageId, 
-			'emailOwnerOnChange' => intval($bEmailOwnerOnChange), 
-			'welcomeOnManualAdd' => intval($bWelcomeOnManualAdd), 
-			'welcomeOnSignupAdd' => intval($bWelcomeOnSignupAdd), 
-			'description'        => $sDescription, 
+			'name'               => $sName,
+			'welcomeMessageId'   => $iWelcomeMessageId,
+			'emailOwnerOnChange' => intval($bEmailOwnerOnChange),
+			'welcomeOnManualAdd' => intval($bWelcomeOnManualAdd),
+			'welcomeOnSignupAdd' => intval($bWelcomeOnSignupAdd),
+			'description'        => $sDescription,
 			'publicname'         => $sPublicName
 		);
 		// Return the list
@@ -702,7 +767,7 @@ class iContactApi {
 	/**
 	 * This method tells the system whether
 	 * or not to use the sandbox or not, the
-	 * sandbox is turned off by defualt and 
+	 * sandbox is turned off by defualt and
 	 * by default this method turns it on
 	 * @access public
 	 * @param bool [$bUse]
@@ -728,8 +793,10 @@ class iContactApi {
 	 * @return iContactApi $this
 	**/
 	protected function addError($sText) {
+		if(!in_array($sText, $this->aErrors)) {
 		// Append the error
-		array_push($this->aErrors, $sText);
+			array_push($this->aErrors, $sText);
+		}
 		// Return instance
 		return $this;
 	}
@@ -771,8 +838,12 @@ class iContactApi {
 	 * @return object
 	**/
 	public function getContact($iContactId) {
+		try {
 		// Make the call and return the data
-		return $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/contacts/{$iContactId}", 'GET', null, 'contact');
+			return $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/contacts/{$iContactId}", 'GET', null, 'contact');
+		} catch (Exception $e) {
+
+		}
 	}
 
 	/**
@@ -787,7 +858,7 @@ class iContactApi {
 	}
 
 	/**
-	 * This method returns any set 
+	 * This method returns any set
 	 * errors in the current instance
 	 * @access public
 	 * @return array|bool
@@ -795,7 +866,7 @@ class iContactApi {
 	public function getErrors() {
 		// Check for errors
 		if (empty($this->aErrors)) {
-			// Return false, for 
+			// Return false, for
 			// there are no errors
 			return false;
 		} else {
@@ -813,18 +884,18 @@ class iContactApi {
 	public function getHeaders() {
 		// Return the headers
 		return array(
-			'Except:', 
-			'Accept:  application/json', 
-			'Content-type:  application/json', 
+			'Except:',
+			'Accept:  application/json',
+			'Content-type:  application/json',
 			'Api-Version:  ' . (defined('ICONTACT_APIVERSION')        ? constant('ICONTACT_APIVERSION') : '2.2'),
-			'Api-AppId:  '   . (!empty($this->aConfig['appId'])       ? $this->aConfig['appId']         : constant('ICONTACT_APPID')), 
-			'Api-Username:  '. (!empty($this->aConfig['apiUsername']) ? $this->aConfig['apiUsername']   : constant('ICONTACT_APIUSERNAME')), 
-			'Api-Password:  '. (!empty($this->aConfig['apiPassword']) ? $this->aConfig['apiPassword']   : constant('ICONTACT_APIPASSWORD'))
+			'Api-AppId:  '   . (!empty($this->aConfig['appId'])       ? $this->aConfig['appId']         : ''),
+			'Api-Username:  '. (!empty($this->aConfig['apiUsername']) ? $this->aConfig['apiUsername']   : ''),
+			'Api-Password:  '. (!empty($this->aConfig['apiPassword']) ? $this->aConfig['apiPassword']   : '')
 		);
 	}
 
 	/**
-	 * This method returns the last 
+	 * This method returns the last
 	 * API POST request JSON
 	 * @access public
 	 * @param bool [$bDecode]
@@ -917,7 +988,7 @@ class iContactApi {
 	}
 
 	/**
-	 * This method simply returns the base URL for 
+	 * This method simply returns the base URL for
 	 * your API/Sandbox account
 	 * @access public
 	 * @param bool [$bFull]
@@ -930,7 +1001,7 @@ class iContactApi {
 		$sApiUrl     = defined('ICONTACT_APIURL')        ? constant('ICONTACT_APIURL')        : 'https://app.icontact.com/icp';
 		// Determine which one needs to be returned with the URL
 		$sBaseUrl    = ($this->bSandbox === true) ? $sSandboxUrl : $sApiUrl;
-		// Do we need to return the entire url or just 
+		// Do we need to return the entire url or just
 		// the base url of the API service
 		if ($bFull === false) {
 			// Return the base url
@@ -993,9 +1064,9 @@ class iContactApi {
 			// Override the Account ID
 			$this->iAccountId = (integer) $iAccountId;
 		} else {
-			// Check to see if the 
+			// Check to see if the
 			// Account ID has already
-			// been stored in the 
+			// been stored in the
 			// instance
 			if (empty($this->iAccountId)) {
 				// Load the Account ID
@@ -1018,11 +1089,11 @@ class iContactApi {
 		// Inevitably return instance
 		return $this->iAccountId;
 	}
-	
+
 	/**
-	 * This method fetches the Client 
+	 * This method fetches the Client
 	 * Folder ID from the iContact API
-	 * if it has not already been stored 
+	 * if it has not already been stored
 	 * in the instance and the Account ID
 	 * has also been stored in the instance
 	 * @access public
@@ -1030,7 +1101,7 @@ class iContactApi {
 	 * @return integer
 	**/
 	public function setClientFolderId($iClientFolderId = null) {
-		// Check for an overriding 
+		// Check for an overriding
 		// Client Folder ID
 		if (!empty($iClientFolderId)) {
 			// Set the Client Folder ID
@@ -1102,5 +1173,20 @@ class iContactApi {
 		$this->aSearchParameters['offset'] = (integer) $iOffset;
 		// Return instance
 		return $this;
+	}
+	/**
+	 * This method grabs a single contact
+	 * from your iContact Account
+	 * @access public
+	 * @param string $Email
+	 * @return object
+	**/
+	public function getContactWithEmail($Email) {
+
+		// Make the call and return the data
+		$this->aSearchParameters['status'] = 'total';
+		$this->aSearchParameters['email'] = $Email;
+		//$this->aSearchParameters['mytermSearchType'] = 'eq';
+		return $this->makeCall("/a/{$this->setAccountId()}/c/{$this->setClientFolderId()}/contacts", 'GET', null, 'contacts');
 	}
 }
